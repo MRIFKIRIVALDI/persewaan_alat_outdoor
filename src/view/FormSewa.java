@@ -2,33 +2,23 @@ package view;
 
 import dao.AlatDAO;
 import database.Koneksi;
-import model.Alat;
-
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.*;
 import java.sql.*;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import model.Alat;
 
-public class FormSewa extends JFrame {
+public class FormSewa extends JPanel {
     private JTextField txtNama, txtNoHp, txtTglPinjam, txtTglKembali;
     private JComboBox<Alat> comboAlat;
     private JTextField txtJumlah;
     private JTable table;
     private DefaultTableModel tableModel;
-    private List<Alat> daftarAlat;
 
     public FormSewa() {
-        setTitle("Form Sewa Alat");
-        setSize(600, 400);
-        setLocationRelativeTo(null);
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Panel Input
         JPanel inputPanel = new JPanel(new GridLayout(6, 2));
         txtNama = new JTextField();
         txtNoHp = new JTextField();
@@ -37,7 +27,7 @@ public class FormSewa extends JFrame {
         comboAlat = new JComboBox<>();
         txtJumlah = new JTextField("1");
 
-        for (Alat a : AlatDAO.getAllAlat()) {
+        for (Alat a : AlatDAO.getAll()) {
             comboAlat.addItem(a);
         }
 
@@ -54,7 +44,6 @@ public class FormSewa extends JFrame {
         JButton btnSimpan = new JButton("Simpan Sewa");
         btnSimpan.addActionListener(e -> simpanSewa());
 
-        // Table
         tableModel = new DefaultTableModel(new String[]{"Alat", "Jumlah", "Harga"}, 0);
         table = new JTable(tableModel);
 
@@ -65,18 +54,28 @@ public class FormSewa extends JFrame {
         add(inputPanel, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
         add(btnPanel, BorderLayout.SOUTH);
-
-        daftarAlat = new ArrayList<>();
     }
 
     private void tambahKeDaftar() {
         Alat selected = (Alat) comboAlat.getSelectedItem();
         int jumlah = Integer.parseInt(txtJumlah.getText());
+
+        // Hitung total jumlah alat yang sudah ditambahkan sebelumnya
+        int jumlahDiTabel = 0;
+        for (int i = 0; i < tableModel.getRowCount(); i++) {
+            Alat alatInTable = (Alat) tableModel.getValueAt(i, 0);
+            if (alatInTable.getId() == selected.getId()) {
+                jumlahDiTabel += Integer.parseInt(tableModel.getValueAt(i, 1).toString());
+            }
+        }
+
+        if (selected.getStokTersedia() < jumlah + jumlahDiTabel) {
+            JOptionPane.showMessageDialog(this, "Stok tidak mencukupi untuk alat: " + selected.getNama());
+            return;
+        }
+
         int total = selected.getHarga() * jumlah;
         tableModel.addRow(new Object[]{selected, jumlah, "Rp " + total});
-        for (int i = 0; i < jumlah; i++) {
-            daftarAlat.add(selected);
-        }
     }
 
     private void simpanSewa() {
@@ -86,9 +85,8 @@ public class FormSewa extends JFrame {
         LocalDate tglKembali = LocalDate.parse(txtTglKembali.getText());
 
         try (Connection conn = Koneksi.getConnection()) {
-            conn.setAutoCommit(false); // transaksi
+            conn.setAutoCommit(false);
 
-            // 1. Simpan ke tabel penyewaan
             String sqlPenyewaan = "INSERT INTO penyewaan(nama_penyewa, no_hp, tanggal_pinjam, tanggal_kembali) VALUES (?, ?, ?, ?)";
             PreparedStatement psPenyewaan = conn.prepareStatement(sqlPenyewaan, Statement.RETURN_GENERATED_KEYS);
             psPenyewaan.setString(1, nama);
@@ -103,28 +101,54 @@ public class FormSewa extends JFrame {
                 idPenyewaan = rs.getInt(1);
             }
 
-            // 2. Simpan ke tabel detail_penyewaan
             String sqlDetail = "INSERT INTO detail_penyewaan(id_penyewaan, id_alat, jumlah) VALUES (?, ?, ?)";
             PreparedStatement psDetail = conn.prepareStatement(sqlDetail);
+
+            String sqlUpdateStok = "UPDATE alat SET stok_tersedia = stok_tersedia - ? WHERE alat_id = ?";
+            PreparedStatement psUpdateStok = conn.prepareStatement(sqlUpdateStok);
+
+            StringBuilder struk = new StringBuilder();
+            int totalHarga = 0;
+
+            struk.append("=== Struk Penyewaan ===\n");
+            struk.append("Nama: ").append(nama).append("\n");
+            struk.append("No HP: ").append(noHp).append("\n");
+            struk.append("Tanggal Pinjam: ").append(tglPinjam).append("\n");
+            struk.append("Tanggal Kembali: ").append(tglKembali).append("\n\n");
+            struk.append("Daftar Alat:\n");
 
             for (int i = 0; i < tableModel.getRowCount(); i++) {
                 Alat alat = (Alat) tableModel.getValueAt(i, 0);
                 int jumlah = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
+                int subtotal = alat.getHarga() * jumlah;
+                totalHarga += subtotal;
 
                 psDetail.setInt(1, idPenyewaan);
                 psDetail.setInt(2, alat.getId());
                 psDetail.setInt(3, jumlah);
                 psDetail.addBatch();
+
+                psUpdateStok.setInt(1, jumlah);
+                psUpdateStok.setInt(2, alat.getId());
+                psUpdateStok.addBatch();
+
+                struk.append("- ").append(alat.getNama()).append(" x").append(jumlah)
+                        .append(" = Rp ").append(subtotal).append("\n");
             }
 
+            struk.append("\nTotal Harga: Rp ").append(totalHarga);
+
             psDetail.executeBatch();
+            psUpdateStok.executeBatch();
             conn.commit();
 
-            JOptionPane.showMessageDialog(this, "Data penyewaan berhasil disimpan!");
-            dispose();
+            JOptionPane.showMessageDialog(this, "Data penyewaan berhasil disimpan!\n\n" + struk.toString());
+            tableModel.setRowCount(0);
+
         } catch (Exception ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "Gagal menyimpan data: " + ex.getMessage());
         }
     }
+
 }

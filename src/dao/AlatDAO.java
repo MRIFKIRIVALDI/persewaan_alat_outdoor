@@ -1,27 +1,28 @@
 package dao;
 
 import database.Koneksi;
-import model.Alat;
-
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import model.Alat;
 
 public class AlatDAO {
 
+    // Untuk FormSewa (versi ringkas + stok tersedia)
     public static List<Alat> getAllAlat() {
         List<Alat> daftarAlat = new ArrayList<>();
 
         try (Connection conn = Koneksi.getConnection()) {
-            String sql = "SELECT id_alat AS id, nama_alat AS nama, harga_sewa AS harga FROM alat";
+            String sql = "SELECT alat_id AS id, nama_alat AS nama, harga_sewa_per_hari AS harga, stok_tersedia FROM alat";
             PreparedStatement stmt = conn.prepareStatement(sql);
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
                 Alat a = new Alat();
-                a.setId(rs.getInt("id"));           // alias 'id' dari query
-                a.setNama(rs.getString("nama"));    // alias 'nama'
-                a.setHarga(rs.getInt("harga"));     // alias 'harga'
+                a.setId(rs.getInt("id"));
+                a.setNama(rs.getString("nama"));
+                a.setHarga(rs.getInt("harga"));
+                a.setStokTersedia(rs.getInt("stok_tersedia")); // ✅ tambahkan ini
                 daftarAlat.add(a);
             }
 
@@ -30,5 +31,27 @@ public class AlatDAO {
         }
 
         return daftarAlat;
+    }
+
+    // Untuk Dashboard (versi lengkap dengan stok)
+    public static List<Alat> getAll() {
+        List<Alat> list = new ArrayList<>();
+        try (Connection conn = Koneksi.getConnection()) {
+            String sql = "SELECT * FROM alat";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Alat a = new Alat();
+                a.setId(rs.getInt("alat_id"));
+                a.setNama(rs.getString("nama_alat"));
+                a.setHarga(rs.getInt("harga_sewa_per_hari"));
+                a.setStokTersedia(rs.getInt("stok_tersedia"));
+                list.add(a);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }

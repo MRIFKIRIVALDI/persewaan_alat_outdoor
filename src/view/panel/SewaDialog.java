@@ -1,15 +1,14 @@
 package view.panel;
 
 import dao.AlatDAO;
-import model.Alat;
-
-import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import javax.swing.*;
+import model.Alat;
 
 public class SewaDialog extends JDialog {
+
     private JTextField tfNama, tfNoHP, tfTanggalPinjam, tfTanggalKembali;
     private JComboBox<String> cbAlat;
     private JLabel lblTotal;
@@ -17,9 +16,9 @@ public class SewaDialog extends JDialog {
 
     public SewaDialog(Frame parent) {
         super(parent, "Form Sewa Alat", true);
-        setSize(400, 350);
+        setSize(450, 400);
         setLocationRelativeTo(parent);
-        setLayout(new GridLayout(7, 2, 5, 5));
+        setLayout(new GridLayout(8, 2, 5, 5));
 
         tfNama = new JTextField();
         tfNoHP = new JTextField();
@@ -27,37 +26,43 @@ public class SewaDialog extends JDialog {
         tfTanggalKembali = new JTextField(LocalDate.now().plusDays(1).toString());
 
         cbAlat = new JComboBox<>();
-        // daftarAlat = AlatDAO.getAllAlat();
-        // for (Alat alat : daftarAlat) {
-        //     cbAlat.addItem(alat.getNama());
-        // }
         daftarAlat = AlatDAO.getAllAlat();
-        System.out.println("Jumlah alat dari database: " + daftarAlat.size());
-        for (Alat a : daftarAlat) {
-            System.out.println("- " + a.getNama() + " Rp" + a.getHarga());
+        for (Alat alat : daftarAlat) {
+            cbAlat.addItem(alat.getNama());
         }
 
         lblTotal = new JLabel("Total: Rp 0");
+
         JButton btnHitung = new JButton("Hitung Total");
         JButton btnSimpan = new JButton("Simpan");
+        JButton btnKembali = new JButton("⬅ Kembali");
 
+        // Tambahkan komponen ke form
         add(new JLabel("Nama"));
         add(tfNama);
+
         add(new JLabel("No HP"));
         add(tfNoHP);
+
         add(new JLabel("Pilih Alat"));
         add(cbAlat);
+
         add(new JLabel("Tanggal Pinjam (YYYY-MM-DD)"));
         add(tfTanggalPinjam);
+
         add(new JLabel("Tanggal Kembali"));
         add(tfTanggalKembali);
+
         add(btnHitung);
         add(lblTotal);
-        add(new JLabel());
-        add(btnSimpan);
 
+        add(btnKembali);  // tombol kembali
+        add(btnSimpan);   // tombol simpan
+
+        // Action listeners
         btnHitung.addActionListener(e -> hitungTotal());
         btnSimpan.addActionListener(e -> simpanData());
+        btnKembali.addActionListener(e -> dispose()); // Menutup dialog
     }
 
     private void hitungTotal() {
@@ -89,6 +94,6 @@ public class SewaDialog extends JDialog {
 
         // Simpan ke database bisa ditambahkan di sini
         JOptionPane.showMessageDialog(this, "Data berhasil disimpan!");
-        dispose();
+        dispose(); // Tutup dialog setelah simpan
     }
 }
